@@ -711,7 +711,7 @@ async function generateReply(userMessage) {
 
   const messages = [
     { role: 'system', content: buildSystemPrompt() },
-    ...messageHistory.slice(-16),
+    ...messageHistory.slice(-8),
     { role: 'user', content: userMessage }
   ];
 
@@ -720,7 +720,7 @@ async function generateReply(userMessage) {
 
   const stream = await engine.chat.completions.create({
     messages,
-    max_tokens: 120,
+    max_tokens: 80,
     temperature: 0.85,
     stream: true,
   });
