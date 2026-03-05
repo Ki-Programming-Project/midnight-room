@@ -648,10 +648,30 @@ function updateStats(msg) {
   const positiveWords = ['ありがとう','嬉しい','好き','うれしい','楽しい'];
   const negativeWords = ['うざい','キモい','バカ','うるさい'];
 
-  let t = 1, i = 0, d = 0;
-  if (deepWords.some(w => msg.includes(w))) { d += 3; t += 2; }
-  if (positiveWords.some(w => msg.includes(w))) { i += 2; t += 1; }
-  if (negativeWords.some(w => msg.includes(w))) { t -= 8; i -= 4; }
+  let t = 0.5, i = 0, d = 0;
+  if (deepWords.some(w => msg.includes(w))) { d += 1; t += 0.5; }
+  if (positiveWords.some(w => msg.includes(w))) { i += 1; t += 0.5; }
+  if (negativeWords.some(w => msg.includes(w))) { t -= 3; i -= 2; }
+
+  // 日次上限キャップ（1セッションあたりの上昇量を制限）
+  const CAP = { trust: 8, intimacy: 5, depth: 4 };
+  const todayKey = 'midnight_room_daily_' + new Date().toDateString();
+  let daily = {};
+  try { daily = JSON.parse(localStorage.getItem(todayKey) || '{}'); } catch(e) {}
+  daily.trust = daily.trust || 0;
+  daily.intimacy = daily.intimacy || 0;
+  daily.depth = daily.depth || 0;
+
+  // キャップを超えた分を削る
+  if (t > 0) t = Math.min(t, CAP.trust - daily.trust);
+  if (i > 0) i = Math.min(i, CAP.intimacy - daily.intimacy);
+  if (d > 0) d = Math.min(d, CAP.depth - daily.depth);
+
+  // 日次累計を更新（マイナスはキャップ対象外）
+  if (t > 0) daily.trust += t;
+  if (i > 0) daily.intimacy += i;
+  if (d > 0) daily.depth += d;
+  try { localStorage.setItem(todayKey, JSON.stringify(daily)); } catch(e) {}
 
   stats.trust = Math.max(0, Math.min(100, stats.trust + t));
   stats.intimacy = Math.max(0, Math.min(100, stats.intimacy + i));
