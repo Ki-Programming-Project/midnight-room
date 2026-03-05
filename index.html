@@ -185,17 +185,21 @@
 
   .status-bar {
     position: fixed; top: 76px; left: 0; right: 0;
-    padding: 8px 32px; display: flex; gap: 24px;
+    padding: 8px 32px; display: flex; gap: 28px;
     background: rgba(8,9,13,0.8); backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border); z-index: 19;
+    align-items: center;
   }
-  .stat-item { display: flex; align-items: center; gap: 8px; }
+  .stat-item { display: flex; align-items: center; gap: 7px; }
   .stat-label { font-size: 9px; color: var(--text-dimmer); letter-spacing: 0.2em; text-transform: uppercase; }
-  .stat-bar { width: 60px; height: 2px; background: var(--border); position: relative; }
-  .stat-fill { position: absolute; left: 0; top: 0; height: 100%; transition: width 0.8s ease; }
-  .stat-fill.trust { background: #5a7fa8; }
-  .stat-fill.intimacy { background: #7c6fa0; }
-  .stat-fill.depth { background: #4a7a6a; }
+  .stat-moon {
+    font-size: 14px;
+    transition: opacity 0.6s ease;
+    line-height: 1;
+  }
+  .stat-moon-tip {
+    font-size: 9px; color: var(--text-dimmer); letter-spacing: 0.1em;
+  }
 
   .messages-area {
     position: fixed; top: 108px; bottom: 80px; left: 0; right: 0;
@@ -353,15 +357,15 @@
   <div class="status-bar">
     <div class="stat-item">
       <div class="stat-label">Trust</div>
-      <div class="stat-bar"><div class="stat-fill trust" id="bar-trust" style="width:0%"></div></div>
+      <div class="stat-moon" id="moon-trust">🌑</div>
     </div>
     <div class="stat-item">
       <div class="stat-label">Intimacy</div>
-      <div class="stat-bar"><div class="stat-fill intimacy" id="bar-intimacy" style="width:0%"></div></div>
+      <div class="stat-moon" id="moon-intimacy">🌑</div>
     </div>
     <div class="stat-item">
       <div class="stat-label">Depth</div>
-      <div class="stat-bar"><div class="stat-fill depth" id="bar-depth" style="width:0%"></div></div>
+      <div class="stat-moon" id="moon-depth">🌑</div>
     </div>
   </div>
 
@@ -594,10 +598,19 @@ ${isFriday ? '- 今日は金曜。少し酒を飲んでいる。' : ''}
 }
 
 // ===== CHAT =====
+function moonPhase(value) {
+  // 0-100を5段階の月フェーズに変換
+  if (value < 10) return '🌑';
+  if (value < 30) return '🌒';
+  if (value < 55) return '🌓';
+  if (value < 80) return '🌔';
+  return '🌕';
+}
+
 function updateStatBars() {
-  document.getElementById('bar-trust').style.width = stats.trust + '%';
-  document.getElementById('bar-intimacy').style.width = stats.intimacy + '%';
-  document.getElementById('bar-depth').style.width = stats.depth + '%';
+  document.getElementById('moon-trust').textContent = moonPhase(stats.trust);
+  document.getElementById('moon-intimacy').textContent = moonPhase(stats.intimacy);
+  document.getElementById('moon-depth').textContent = moonPhase(stats.depth);
 }
 
 function addMessage(role, content, streaming = false) {
