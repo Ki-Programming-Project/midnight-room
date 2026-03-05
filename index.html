@@ -821,25 +821,31 @@ window.sendMessage = async function() {
   const text = input.value.trim();
   if (!text) return;
 
+  // 即座に入力欄をクリアしてスレッドに表示
   input.value = '';
   input.style.height = 'auto';
-  isGenerating = true;
+  input.disabled = true;
   document.getElementById('send-btn').disabled = true;
+  isGenerating = true;
 
   addMessage('user', text);
   messageHistory.push({ role: 'user', content: text });
   updateStats(text);
 
-  try {
-    const reply = await generateReply(text);
-    messageHistory.push({ role: 'assistant', content: reply });
-    saveState();
-  } catch(e) {
-    addMessage('ai', '…少し待ってくれ。');
-  }
-
-  isGenerating = false;
-  document.getElementById('send-btn').disabled = false;
+  // 入力欄クリア後に非同期でAI生成開始
+  setTimeout(async () => {
+    try {
+      const reply = await generateReply(text);
+      messageHistory.push({ role: 'assistant', content: reply });
+      saveState();
+    } catch(e) {
+      addMessage('ai', '…少し待ってくれ。');
+    }
+    isGenerating = false;
+    input.disabled = false;
+    document.getElementById('send-btn').disabled = false;
+    input.focus();
+  }, 0);
 };
 
 document.getElementById('chat-input').addEventListener('keydown', e => {
