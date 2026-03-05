@@ -701,14 +701,79 @@ async function generateReply(userMessage) {
 }
 
 async function sendOpeningMessage() {
+  // 履歴がある場合は開幕セリフをスキップ
+  if (messageHistory.length > 0) {
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('chat-input').disabled = false;
+    return;
+  }
+
   showTyping(true);
   await new Promise(r => setTimeout(r, 900));
   showTyping(false);
 
-  const greetings = ['来たか。', '遅かったな。', '雨、続いてるな。'];
-  const opening = greetings[Math.floor(Math.random() * greetings.length)];
+  const now = new Date();
+  const hour = now.getHours();
+  const day = now.getDay(); // 0=日, 5=金, 6=土
+  const trust = stats.trust;
+
+  // 時間帯
+  const isLateNight = hour >= 0 && hour < 3;   // 深夜0〜3時
+  const isEarlyNight = hour >= 22;              // 22〜24時
+  const isFriday = day === 5;
+  const isSaturday = day === 6;
+  const isSunday = day === 0;
+
+  // スコア段階
+  const isStranger = trust < 20;
+  const isFamiliar = trust >= 20 && trust < 50;
+  const isClose = trust >= 50;
+
+  let pool = [];
+
+  if (isClose) {
+    // 親しい関係
+    pool = [
+      'また来たか。',
+      '待ってた。',
+      '今日はどうだった。',
+      'お前が来ると思ってた。',
+    ];
+  } else if (isFamiliar) {
+    // 少し顔見知り
+    pool = [
+      'また来たな。',
+      '眠れなかったか。',
+      '雨、まだ降ってる。',
+      '今夜も長そうだな。',
+    ];
+  } else {
+    // 初対面・初期
+    pool = [
+      '来たか。',
+      '遅かったな。',
+      '雨、続いてるな。',
+      'こんな時間に。',
+    ];
+  }
+
+  // 時間帯で上書き
+  if (isLateNight) {
+    pool.push('こんな時間まで起きてるのか。', 'もう深夜だぞ。', '…眠れないのか。');
+  }
+
+  // 曜日で追加
+  if (isFriday) {
+    pool.push('金曜か。お疲れ。', '今日は飲んでる。少し。');
+  }
+  if (isSaturday || isSunday) {
+    pool.push('週末か。', '休みの夜は長い。');
+  }
+
+  const opening = pool[Math.floor(Math.random() * pool.length)];
   messageHistory.push({ role: 'assistant', content: opening });
   addMessage('ai', opening);
+  saveState();
 
   document.getElementById('send-btn').disabled = false;
   document.getElementById('chat-input').disabled = false;
