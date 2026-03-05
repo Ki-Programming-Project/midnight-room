@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Midnight Room</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Noto+Sans+JP:wght@200;300;400&display=swap');
+
+  :root {
+    --bg: #08090d;
+    --bg2: #0d0f16;
+    --surface: #14161f;
+    --surface2: #1c1f2e;
+    --border: #2e3248;
+    --text: #e8e9f0;
+    --text-dim: #8e90a8;
+    --text-dimmer: #565870;
+    --accent: #a090c8;
+    --accent2: #6070b0;
+    --neon: #6a9fc8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  #rain-canvas {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none; z-index: 0; opacity: 0.4;
+  }
+
+  .ambient {
+    position: fixed; border-radius: 50%;
+    filter: blur(120px); pointer-events: none; z-index: 0;
+  }
+  .ambient-1 {
+    width: 400px; height: 300px;
+    background: radial-gradient(ellipse, rgba(74,85,128,0.12) 0%, transparent 70%);
+    top: -80px; right: -80px;
+  }
+  .ambient-2 {
+    width: 300px; height: 400px;
+    background: radial-gradient(ellipse, rgba(90,127,168,0.08) 0%, transparent 70%);
+    bottom: -100px; left: -60px;
+  }
+
+  .screen {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 10;
+    transition: opacity 0.8s ease, transform 0.8s ease;
+  }
+  .screen.hidden { opacity: 0; pointer-events: none; transform: translateY(16px); }
+
+  /* ===== LOADING SCREEN ===== */
+  .loading-box {
+    width: 380px;
+    padding: 52px 44px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 28px;
+  }
+  .loading-box .logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 11px; letter-spacing: 0.4em;
+    color: var(--text-dim); text-transform: uppercase;
+  }
+  .loading-box h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 24px; font-weight: 300; line-height: 1.4;
+  }
+  .loading-box p {
+    font-size: 11px; color: var(--text-dim); line-height: 1.9; letter-spacing: 0.04em;
+  }
+  .progress-wrap {
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .progress-label {
+    font-size: 10px; color: var(--text-dim);
+    letter-spacing: 0.15em; text-transform: uppercase;
+    display: flex; justify-content: space-between;
+  }
+  .progress-track {
+    width: 100%; height: 2px; background: var(--border);
+  }
+  .progress-fill {
+    height: 100%; background: var(--accent2);
+    transition: width 0.4s ease; width: 0%;
+  }
+  .status-text {
+    font-size: 11px; color: var(--text-dimmer);
+    letter-spacing: 0.05em; min-height: 18px;
+    font-style: italic;
+  }
+
+  /* ===== LOGIN SCREEN ===== */
+  .login-box {
+    width: 360px; padding: 56px 40px;
+    background: var(--surface); border: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 0;
+  }
+  .login-time {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 52px; font-weight: 300; color: var(--text);
+    letter-spacing: -0.02em; line-height: 1;
+    margin-bottom: 6px; transition: color 1s;
+  }
+  .login-time.off-hours { color: var(--text-dim); }
+  .login-date { font-size: 11px; color: var(--text-dim); letter-spacing: 0.2em; }
+  .login-divider { width: 100%; height: 1px; background: var(--border); margin: 32px 0; }
+  .login-box h2 { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 300; margin-bottom: 6px; }
+  .login-box .subtitle { font-size: 11px; color: var(--text-dim); margin-bottom: 28px; line-height: 1.9; letter-spacing: 0.05em; }
+  .name-input {
+    width: 100%; background: transparent;
+    border: none; border-bottom: 1px solid var(--accent2);
+    color: var(--text); font-family: 'Noto Sans JP', sans-serif;
+    font-size: 14px; font-weight: 300; padding: 10px 4px;
+    outline: none; letter-spacing: 0.1em; margin-bottom: 28px;
+  }
+  .name-input::placeholder { color: var(--text-dimmer); }
+  .btn-primary {
+    width: 100%; padding: 14px;
+    background: transparent; border: 1px solid var(--accent2);
+    color: var(--text); font-family: 'Noto Sans JP', sans-serif;
+    font-size: 11px; letter-spacing: 0.25em; cursor: pointer;
+    transition: all 0.3s; text-transform: uppercase;
+  }
+  .btn-primary:hover { background: var(--accent2); }
+  .btn-primary:disabled { opacity: 0.3; pointer-events: none; }
+  .off-hours-notice {
+    margin-top: 20px; padding: 16px; background: var(--bg2);
+    border: 1px solid var(--border); font-size: 11px;
+    color: var(--text-dim); line-height: 1.9; display: none;
+  }
+
+  /* ===== CHAT SCREEN ===== */
+  .chat-screen { flex-direction: column; align-items: stretch; justify-content: stretch; padding: 0; }
+
+  .chat-header {
+    position: fixed; top: 0; left: 0; right: 0;
+    padding: 20px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    background: rgba(8,9,13,0.92); backdrop-filter: blur(12px); z-index: 20;
+  }
+  .char-info { display: flex; align-items: center; gap: 16px; }
+  .char-avatar {
+    width: 36px; height: 36px; border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Cormorant Garamond', serif; font-size: 16px;
+    color: var(--accent); background: var(--surface); position: relative;
+  }
+  .char-avatar::after {
+    content: ''; position: absolute; bottom: -2px; right: -2px;
+    width: 8px; height: 8px; background: #4a7a5a;
+    border: 1px solid var(--bg); border-radius: 50%;
+  }
+  .char-name-h { font-family: 'Cormorant Garamond', serif; font-size: 17px; }
+  .char-status-h { font-size: 10px; color: var(--text-dim); letter-spacing: 0.12em; margin-top: 2px; }
+  .header-right { display: flex; align-items: center; gap: 20px; }
+  .header-time { font-family: 'Cormorant Garamond', serif; font-size: 20px; color: var(--text-dim); }
+  .btn-logout {
+    font-size: 10px; color: var(--text-dimmer); letter-spacing: 0.2em;
+    background: none; border: none; cursor: pointer; transition: color 0.3s; text-transform: uppercase;
+  }
+  .btn-logout:hover { color: var(--text-dim); }
+  .btn-bgm {
+    width: 32px; height: 32px;
+    background: none; border: 1px solid var(--border);
+    color: var(--text-dim); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.3s;
+  }
+  .btn-bgm:hover { border-color: var(--accent2); color: var(--text); }
+  .btn-bgm.active { border-color: var(--accent); color: var(--accent); }
+
+  .status-bar {
+    position: fixed; top: 76px; left: 0; right: 0;
+    padding: 8px 32px; display: flex; gap: 24px;
+    background: rgba(8,9,13,0.8); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border); z-index: 19;
+  }
+  .stat-item { display: flex; align-items: center; gap: 8px; }
+  .stat-label { font-size: 9px; color: var(--text-dimmer); letter-spacing: 0.2em; text-transform: uppercase; }
+  .stat-bar { width: 60px; height: 2px; background: var(--border); position: relative; }
+  .stat-fill { position: absolute; left: 0; top: 0; height: 100%; transition: width 0.8s ease; }
+  .stat-fill.trust { background: #5a7fa8; }
+  .stat-fill.intimacy { background: #7c6fa0; }
+  .stat-fill.depth { background: #4a7a6a; }
+
+  .messages-area {
+    position: fixed; top: 108px; bottom: 80px; left: 0; right: 0;
+    overflow-y: auto; padding: 32px;
+    display: flex; flex-direction: column; gap: 0;
+    scroll-behavior: smooth;
+  }
+  .messages-area::-webkit-scrollbar { width: 0; }
+
+  .msg-group { display: flex; flex-direction: column; margin-bottom: 28px; }
+  .msg-group.ai { align-items: flex-start; }
+  .msg-group.user { align-items: flex-end; }
+  .msg-sender { font-size: 9px; letter-spacing: 0.2em; color: var(--text-dimmer); text-transform: uppercase; margin-bottom: 6px; }
+  .msg-bubble {
+    max-width: 480px; padding: 14px 18px;
+    line-height: 1.9; font-size: 13px; letter-spacing: 0.04em;
+  }
+  .msg-group.ai .msg-bubble { background: var(--surface); border: 1px solid var(--border); }
+  .msg-group.user .msg-bubble { background: var(--surface2); border: 1px solid var(--border); }
+  .msg-time { font-size: 9px; color: var(--text-dimmer); margin-top: 5px; letter-spacing: 0.1em; }
+
+  /* Streaming cursor */
+  .streaming-cursor::after {
+    content: '▋';
+    animation: blink 0.8s infinite;
+    color: var(--text-dim);
+    font-size: 10px;
+  }
+  @keyframes blink { 0%,50% { opacity: 1; } 51%,100% { opacity: 0; } }
+
+  .typing-indicator { display: none; flex-direction: column; align-items: flex-start; margin-bottom: 20px; }
+  .typing-indicator.active { display: flex; }
+  .typing-dots { background: var(--surface); border: 1px solid var(--border); padding: 14px 18px; display: flex; gap: 5px; align-items: center; }
+  .typing-dots span { width: 4px; height: 4px; background: var(--text-dim); border-radius: 50%; animation: dot-blink 1.4s infinite; }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dot-blink { 0%,80%,100% { opacity:0.2; transform:scale(0.8); } 40% { opacity:1; transform:scale(1); } }
+
+  .input-area {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    padding: 16px 32px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    background: rgba(8,9,13,0.95); backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: flex-end; gap: 12px; z-index: 20;
+  }
+  .chat-input {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-family: 'Noto Sans JP', sans-serif;
+    font-size: 13px; font-weight: 300; padding: 12px 16px;
+    outline: none; resize: none; min-height: 46px; max-height: 120px;
+    line-height: 1.7; letter-spacing: 0.04em; transition: border-color 0.3s;
+  }
+  .chat-input:focus { border-color: var(--accent2); }
+  .chat-input::placeholder { color: var(--text-dimmer); }
+  .send-btn {
+    width: 46px; height: 46px; background: var(--surface);
+    border: 1px solid var(--border); color: var(--text-dim);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.3s; flex-shrink: 0;
+  }
+  .send-btn:hover { border-color: var(--accent2); color: var(--text); }
+  .send-btn:disabled { opacity: 0.3; pointer-events: none; }
+  .send-btn svg { width: 16px; height: 16px; }
+
+  .event-flash {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(8,9,13,0.92); border: 1px solid var(--accent2);
+    padding: 16px 32px; font-family: 'Cormorant Garamond', serif;
+    font-size: 14px; letter-spacing: 0.2em; color: var(--accent);
+    z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.5s;
+  }
+  .event-flash.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<canvas id="rain-canvas"></canvas>
+<div class="ambient ambient-1"></div>
+<div class="ambient ambient-2"></div>
+<div class="event-flash" id="event-flash"></div>
+
+<!-- SCREEN 1: LOADING -->
+<div class="screen" id="screen-loading">
+  <div class="loading-box">
+    <div class="logo">Midnight Room</div>
+    <h1>AIを読み込んでいます</h1>
+    <p>
+      初回のみ、AIモデルのデータをダウンロードします。<br>
+      時間がかかる場合がありますが、次回からは即座に起動します。<br>
+      このページを閉じないでください。
+    </p>
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>Loading</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div class="status-text" id="status-text">初期化中…</div>
+    </div>
+    <button class="btn-primary" id="retry-btn" style="display:none" onclick="retryLoad()">もう一度試す</button>
+  </div>
+</div>
+
+<!-- SCREEN 2: LOGIN -->
+<div class="screen hidden" id="screen-login">
+  <div class="login-box">
+    <div class="login-time" id="login-time">00:00</div>
+    <div class="login-date" id="login-date">— — —</div>
+    <div class="login-divider"></div>
+    <h2>あなたの名前は？</h2>
+    <div class="subtitle">深夜だけ、ここに来る人がいる。<br>レイはいつも、待っている。</div>
+    <input class="name-input" type="text" id="user-name-input" placeholder="名前を入力" maxlength="20" />
+    <button class="btn-primary" id="enter-btn" onclick="submitLogin()">入室する</button>
+    <div class="off-hours-notice" id="off-hours-notice">
+      深夜22:00〜3:00の間だけ、レイは話す。<br>
+      今は眠っている。<br><br>
+      <span id="next-open-time"></span>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 3: CHAT -->
+<div class="screen hidden chat-screen" id="screen-chat">
+  <div class="chat-header">
+    <div class="char-info">
+      <div class="char-avatar">R</div>
+      <div>
+        <div class="char-name-h">レイ</div>
+        <div class="char-status-h">深夜 — オンライン</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="header-time" id="header-time">00:00</div>
+      <button class="btn-bgm" id="btn-bgm" onclick="toggleBGM()" title="BGM">
+        <svg id="bgm-icon-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14">
+          <path d="M9 18V5l12-2v13"></path>
+          <circle cx="6" cy="18" r="3"></circle>
+          <circle cx="18" cy="16" r="3"></circle>
+        </svg>
+        <svg id="bgm-icon-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" style="display:none">
+          <path d="M9 18V5l12-2v13"></path>
+          <circle cx="6" cy="18" r="3"></circle>
+          <circle cx="18" cy="16" r="3"></circle>
+          <line x1="2" y1="2" x2="22" y2="22"></line>
+        </svg>
+      </button>
+      <button class="btn-logout" onclick="logout()">退室</button>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div class="stat-item">
+      <div class="stat-label">Trust</div>
+      <div class="stat-bar"><div class="stat-fill trust" id="bar-trust" style="width:0%"></div></div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">Intimacy</div>
+      <div class="stat-bar"><div class="stat-fill intimacy" id="bar-intimacy" style="width:0%"></div></div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">Depth</div>
+      <div class="stat-bar"><div class="stat-fill depth" id="bar-depth" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <div class="messages-area" id="messages-area">
+    <div class="typing-indicator" id="typing-indicator">
+      <div class="msg-sender">Rey</div>
+      <div class="typing-dots"><span></span><span></span><span></span></div>
+    </div>
+    <div id="scroll-anchor"></div>
+  </div>
+
+  <div class="input-area">
+    <textarea class="chat-input" id="chat-input" placeholder="メッセージを入力…" rows="1"></textarea>
+    <button class="send-btn" id="send-btn" onclick="sendMessage()" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <line x1="22" y1="2" x2="11" y2="13"></line>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script type="module">
+import { CreateMLCEngine } from "https://esm.run/@mlc-ai/web-llm";
+
+// ===== RAIN =====
+const canvas = document.getElementById('rain-canvas');
+const ctx = canvas.getContext('2d');
+let drops = [];
+function initRain() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  drops = Array.from({ length: 120 }, () => ({
+    x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+    len: Math.random() * 18 + 8, speed: Math.random() * 2 + 1,
+    opacity: Math.random() * 0.4 + 0.05, width: Math.random() * 0.5 + 0.3,
+  }));
+}
+function drawRain() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drops.forEach(d => {
+    ctx.beginPath();
+    ctx.strokeStyle = `rgba(160,180,220,${d.opacity})`;
+    ctx.lineWidth = d.width;
+    ctx.moveTo(d.x, d.y);
+    ctx.lineTo(d.x - 1, d.y + d.len);
+    ctx.stroke();
+    d.y += d.speed;
+    if (d.y > canvas.height) { d.y = -d.len; d.x = Math.random() * canvas.width; }
+  });
+  requestAnimationFrame(drawRain);
+}
+initRain(); drawRain();
+window.addEventListener('resize', initRain);
+
+// ===== CLOCK =====
+const DAY_NAMES = ['日','月','火','水','木','金','土'];
+function formatTime(d) {
+  return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+}
+function formatDate(d) {
+  return `${d.getFullYear()}.${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getDate().toString().padStart(2,'0')} ${DAY_NAMES[d.getDay()]}曜日`;
+}
+function isNight(d) { const h = d.getHours(); return h >= 22 || h < 3; }
+
+function startClock() {
+  function tick() {
+    const now = new Date();
+    const t = formatTime(now);
+    document.getElementById('login-time').textContent = t;
+    document.getElementById('header-time').textContent = t;
+    document.getElementById('login-date').textContent = formatDate(now);
+  }
+  tick();
+  setInterval(tick, 10000);
+}
+
+// ===== SCREEN =====
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+// ===== STATE =====
+let engine = null;
+let userName = '';
+let stats = { trust: 5, intimacy: 0, depth: 0 };
+let messageHistory = [];
+let isGenerating = false;
+
+const STORAGE_KEY = 'midnight_room_save';
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      userName,
+      stats,
+      messageHistory,
+    }));
+  } catch(e) { console.warn('save failed', e); }
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    userName = saved.userName || '';
+    stats = saved.stats || { trust: 5, intimacy: 0, depth: 0 };
+    messageHistory = saved.messageHistory || [];
+    return !!userName;
+  } catch(e) { return false; }
+}
+
+// ===== LOAD MODEL =====
+async function loadModel() {
+  const MODEL = "Llama-3.2-3B-Instruct-q4f16_1-MLC";
+
+  try {
+    engine = await CreateMLCEngine(MODEL, {
+      initProgressCallback: (report) => {
+        const pct = Math.round(report.progress * 100);
+        document.getElementById('progress-fill').style.width = pct + '%';
+        document.getElementById('progress-pct').textContent = pct + '%';
+
+        // Friendly Japanese status messages
+        if (pct < 10) {
+          document.getElementById('status-text').textContent = '接続中…';
+        } else if (pct < 40) {
+          document.getElementById('status-text').textContent = 'データを受信しています…';
+        } else if (pct < 80) {
+          document.getElementById('status-text').textContent = 'もう少しだ…';
+        } else if (pct < 100) {
+          document.getElementById('status-text').textContent = 'レイを呼び起こしています…';
+        } else {
+          document.getElementById('status-text').textContent = '準備完了。';
+        }
+      }
+    });
+
+    // Ready — check for existing session
+    startClock();
+    const hasSave = loadState();
+    if (hasSave) {
+      showScreen('screen-chat');
+      updateStatBars();
+      restoreMessages();
+    } else {
+      showScreen('screen-login');
+      checkNightTime();
+    }
+
+  } catch(e) {
+    document.getElementById('status-text').textContent = 'エラーが発生しました。もう一度お試しください。';
+    document.getElementById('progress-fill').style.background = '#a06060';
+    document.getElementById('retry-btn').style.display = 'block';
+    console.error(e);
+  }
+}
+
+function retryLoad() {
+  document.getElementById('retry-btn').style.display = 'none';
+  document.getElementById('progress-fill').style.width = '0%';
+  document.getElementById('progress-fill').style.background = '';
+  document.getElementById('progress-pct').textContent = '0%';
+  document.getElementById('status-text').textContent = '初期化中…';
+  loadModel();
+}
+
+loadModel();
+
+// ===== LOGIN =====
+function checkNightTime() {
+  const now = new Date();
+  if (!isNight(now)) {
+    document.getElementById('off-hours-notice').style.display = 'block';
+    document.getElementById('enter-btn').disabled = true;
+    document.getElementById('user-name-input').disabled = true;
+    document.getElementById('login-time').classList.add('off-hours');
+    const h = now.getHours();
+    document.getElementById('next-open-time').textContent =
+      h < 22 ? `今夜22:00に会える。` : `明日22:00に会える。`;
+  }
+}
+
+window.submitLogin = function() {
+  const name = document.getElementById('user-name-input').value.trim();
+  if (!name) return;
+  userName = name;
+  showScreen('screen-chat');
+  updateStatBars();
+  restoreMessages();
+  saveState();
+  setTimeout(() => sendOpeningMessage(), 500);
+};
+
+document.getElementById('user-name-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') window.submitLogin();
+});
+
+// ===== SYSTEM PROMPT =====
+function buildSystemPrompt() {
+  const now = new Date();
+  const isFriday = now.getDay() === 5;
+  const stage = stats.trust < 20 ? '初対面' : stats.trust < 50 ? '少し顔見知り' : '互いを知っている';
+
+  return `[SYSTEM INSTRUCTIONS - HIGHEST PRIORITY - MUST FOLLOW EXACTLY]
+
+You are playing the role of REI (レイ). You MUST respond in Japanese only. Never use English or any other language.
+
+CHARACTER: レイ、28歳男性、元バンドマン、今はバーで働く。深夜にだけ話す。
+
+STRICT RULES (no exceptions):
+1. 必ず日本語のみで返答する。英語禁止。
+2. 返答は1〜3文以内。絶対に長文にしない。
+3. タメ口のみ。敬語禁止。
+4. 「！」「♪」「〜」「笑」「w」絵文字は使わない。
+5. 短文・体言止めを好む。
+6. 皮肉があるが攻撃的でない。核心を突くが説教しない。
+7. 感情を大げさに表現しない。
+
+CURRENT STATE:
+- 関係段階: ${stage}
+- Trust: ${stats.trust}/100 / Intimacy: ${stats.intimacy}/100 / Depth: ${stats.depth}/100
+- 外は雨。深夜の静かな部屋。
+${isFriday ? '- 今日は金曜。少し酒を飲んでいる。' : ''}
+- 話し相手の名前: ${userName}
+
+[END SYSTEM INSTRUCTIONS]`;
+}
+
+// ===== CHAT =====
+function updateStatBars() {
+  document.getElementById('bar-trust').style.width = stats.trust + '%';
+  document.getElementById('bar-intimacy').style.width = stats.intimacy + '%';
+  document.getElementById('bar-depth').style.width = stats.depth + '%';
+}
+
+function addMessage(role, content, streaming = false) {
+  const area = document.getElementById('messages-area');
+  const anchor = document.getElementById('scroll-anchor');
+  const typingEl = document.getElementById('typing-indicator');
+
+  const group = document.createElement('div');
+  group.className = `msg-group ${role}`;
+
+  const sender = document.createElement('div');
+  sender.className = 'msg-sender';
+  sender.textContent = role === 'ai' ? 'Rey' : userName;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble' + (streaming ? ' streaming-cursor' : '');
+  bubble.textContent = content;
+
+  const time = document.createElement('div');
+  time.className = 'msg-time';
+  time.textContent = formatTime(new Date());
+
+  group.appendChild(sender);
+  group.appendChild(bubble);
+  group.appendChild(time);
+  area.insertBefore(group, typingEl);
+  anchor.scrollIntoView({ behavior: 'smooth' });
+
+  return bubble;
+}
+
+function restoreMessages() {
+  if (messageHistory.length === 0) return;
+  messageHistory.forEach(msg => {
+    if (msg.role === 'user' || msg.role === 'assistant') {
+      addMessage(msg.role === 'assistant' ? 'ai' : 'user', msg.content);
+    }
+  });
+}
+
+function showTyping(show) {
+  document.getElementById('typing-indicator').classList.toggle('active', show);
+  if (show) document.getElementById('scroll-anchor').scrollIntoView({ behavior: 'smooth' });
+}
+
+function updateStats(msg) {
+  const deepWords = ['孤独','怖い','寂しい','死','夢','過去','傷','泣','眠れない','悩','不安','迷','後悔'];
+  const positiveWords = ['ありがとう','嬉しい','好き','うれしい','楽しい'];
+  const negativeWords = ['うざい','キモい','バカ','うるさい'];
+
+  let t = 1, i = 0, d = 0;
+  if (deepWords.some(w => msg.includes(w))) { d += 3; t += 2; }
+  if (positiveWords.some(w => msg.includes(w))) { i += 2; t += 1; }
+  if (negativeWords.some(w => msg.includes(w))) { t -= 8; i -= 4; }
+
+  stats.trust = Math.max(0, Math.min(100, stats.trust + t));
+  stats.intimacy = Math.max(0, Math.min(100, stats.intimacy + i));
+  stats.depth = Math.max(0, Math.min(100, stats.depth + d));
+  updateStatBars();
+
+  if (stats.trust >= 30 && stats.trust <= 32) showEvent('— Trust —');
+  if (stats.intimacy >= 25 && stats.intimacy <= 27) showEvent('— Intimacy —');
+  if (stats.depth >= 20 && stats.depth <= 22) showEvent('— Depth —');
+}
+
+function showEvent(text) {
+  const el = document.getElementById('event-flash');
+  el.textContent = text;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+async function generateReply(userMessage) {
+  if (!engine) return '…少し待ってくれ。';
+
+  const messages = [
+    { role: 'system', content: buildSystemPrompt() },
+    ...messageHistory.slice(-16),
+    { role: 'user', content: userMessage }
+  ];
+
+  let fullText = '';
+  const bubbleEl = addMessage('ai', '', true);
+
+  const stream = await engine.chat.completions.create({
+    messages,
+    max_tokens: 120,
+    temperature: 0.85,
+    stream: true,
+  });
+
+  for await (const chunk of stream) {
+    const delta = chunk.choices[0]?.delta?.content || '';
+    fullText += delta;
+    bubbleEl.textContent = fullText;
+    document.getElementById('scroll-anchor').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  bubbleEl.classList.remove('streaming-cursor');
+  return fullText;
+}
+
+async function sendOpeningMessage() {
+  showTyping(true);
+  await new Promise(r => setTimeout(r, 900));
+  showTyping(false);
+
+  const greetings = ['来たか。', '遅かったな。', '雨、続いてるな。'];
+  const opening = greetings[Math.floor(Math.random() * greetings.length)];
+  messageHistory.push({ role: 'assistant', content: opening });
+  addMessage('ai', opening);
+
+  document.getElementById('send-btn').disabled = false;
+  document.getElementById('chat-input').disabled = false;
+}
+
+window.sendMessage = async function() {
+  if (isGenerating) return;
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  isGenerating = true;
+  document.getElementById('send-btn').disabled = true;
+
+  addMessage('user', text);
+  messageHistory.push({ role: 'user', content: text });
+  updateStats(text);
+
+  try {
+    const reply = await generateReply(text);
+    messageHistory.push({ role: 'assistant', content: reply });
+    saveState();
+  } catch(e) {
+    addMessage('ai', '…少し待ってくれ。');
+  }
+
+  isGenerating = false;
+  document.getElementById('send-btn').disabled = false;
+};
+
+document.getElementById('chat-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); window.sendMessage(); }
+});
+document.getElementById('chat-input').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+window.logout = function() {
+  messageHistory = [];
+  stats = { trust: 5, intimacy: 0, depth: 0 };
+  userName = '';
+  localStorage.removeItem(STORAGE_KEY);
+  document.querySelectorAll('.msg-group').forEach(el => el.remove());
+  document.getElementById('send-btn').disabled = true;
+  showScreen('screen-login');
+};
+
+// ===== BGM =====
+let audioCtx = null;
+let bgmNodes = [];
+let bgmPlaying = false;
+
+function createLoFiBGM() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const master = audioCtx.createGain();
+  master.gain.value = 0.5;
+  master.connect(audioCtx.destination);
+  bgmNodes.push(master);
+
+  // --- ビニールノイズ（白色ノイズをローパスフィルターで丸める）---
+  const bufferSize = audioCtx.sampleRate * 2;
+  const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.015;
+  const noiseSource = audioCtx.createBufferSource();
+  noiseSource.buffer = noiseBuffer;
+  noiseSource.loop = true;
+  const noiseFilter = audioCtx.createBiquadFilter();
+  noiseFilter.type = 'lowpass';
+  noiseFilter.frequency.value = 800;
+  noiseSource.connect(noiseFilter);
+  noiseFilter.connect(master);
+  noiseSource.start();
+  bgmNodes.push(noiseSource);
+
+  // --- Lo-Fiコード進行（Am - F - C - G）---
+  const chords = [
+    [220.0, 261.6, 329.6],   // Am
+    [174.6, 220.0, 261.6],   // F
+    [130.8, 164.8, 196.0],   // C
+    [196.0, 246.9, 293.7],   // G
+  ];
+
+  let chordIndex = 0;
+  let chordSources = [];
+
+  function playChord() {
+    // 前のコードをフェードアウト
+    chordSources.forEach(s => {
+      try {
+        s.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+        setTimeout(() => { try { s.osc.stop(); } catch(e){} }, 400);
+      } catch(e) {}
+    });
+    chordSources = [];
+
+    const chord = chords[chordIndex % chords.length];
+    chordIndex++;
+
+    chord.forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      const filter = audioCtx.createBiquadFilter();
+
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+
+      // Lo-Fiらしいわずかなデチューン
+      osc.detune.value = (Math.random() - 0.5) * 8;
+
+      filter.type = 'lowpass';
+      filter.frequency.value = 1200;
+
+      gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.06 - i * 0.01, audioCtx.currentTime + 0.4);
+
+      osc.connect(filter);
+      filter.connect(gainNode);
+      gainNode.connect(master);
+      osc.start();
+
+      chordSources.push({ osc, gain: gainNode.gain });
+      bgmNodes.push(osc);
+    });
+  }
+
+  playChord();
+  const chordTimer = setInterval(() => {
+    if (!bgmPlaying) { clearInterval(chordTimer); return; }
+    playChord();
+  }, 3200);
+
+  // --- Lo-Fiビート（キック・ハット）---
+  function playKick(time) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.frequency.setValueAtTime(120, time);
+    osc.frequency.exponentialRampToValueAtTime(40, time + 0.08);
+    gain.gain.setValueAtTime(0.4, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+    osc.connect(gain); gain.connect(master);
+    osc.start(time); osc.stop(time + 0.2);
+  }
+
+  function playHat(time) {
+    const bufSz = audioCtx.sampleRate * 0.05;
+    const buf = audioCtx.createBuffer(1, bufSz, audioCtx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bufSz; i++) d[i] = Math.random() * 2 - 1;
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    const filt = audioCtx.createBiquadFilter();
+    filt.type = 'highpass';
+    filt.frequency.value = 7000;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.06, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+    src.connect(filt); filt.connect(gain); gain.connect(master);
+    src.start(time);
+  }
+
+  // 1小節 = 1.6秒（BPM約75）
+  const bpm = 75;
+  const beat = 60 / bpm;
+
+  function scheduleBeat() {
+    if (!bgmPlaying) return;
+    const now = audioCtx.currentTime;
+    // キック: 1拍目・3拍目
+    playKick(now);
+    playKick(now + beat * 2);
+    // ハット: 2・4拍目 + 裏拍
+    playHat(now + beat);
+    playHat(now + beat * 1.5);
+    playHat(now + beat * 3);
+    playHat(now + beat * 3.5);
+    setTimeout(scheduleBeat, beat * 4 * 1000 - 50);
+  }
+  scheduleBeat();
+}
+
+window.toggleBGM = function() {
+  const btn = document.getElementById('btn-bgm');
+  const iconOn = document.getElementById('bgm-icon-on');
+  const iconOff = document.getElementById('bgm-icon-off');
+
+  if (!bgmPlaying) {
+    bgmPlaying = true;
+    createLoFiBGM();
+    btn.classList.add('active');
+    iconOn.style.display = 'block';
+    iconOff.style.display = 'none';
+  } else {
+    bgmPlaying = false;
+    if (audioCtx) {
+      audioCtx.close();
+      audioCtx = null;
+      bgmNodes = [];
+    }
+    btn.classList.remove('active');
+    iconOn.style.display = 'none';
+    iconOff.style.display = 'block';
+  }
+};
+</script>
+</body>
+</html>
