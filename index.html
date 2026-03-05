@@ -455,6 +455,7 @@ let userName = '';
 let stats = { trust: 5, intimacy: 0, depth: 0 };
 let messageHistory = [];
 let isGenerating = false;
+let milestones = { trust30: false, intimacy25: false, depth20: false };
 
 const STORAGE_KEY = 'midnight_room_save';
 
@@ -464,6 +465,7 @@ function saveState() {
       userName,
       stats,
       messageHistory,
+      milestones,
     }));
   } catch(e) { console.warn('save failed', e); }
 }
@@ -476,6 +478,7 @@ function loadState() {
     userName = saved.userName || '';
     stats = saved.stats || { trust: 5, intimacy: 0, depth: 0 };
     messageHistory = saved.messageHistory || [];
+    milestones = saved.milestones || { trust30: false, intimacy25: false, depth20: false };
     return !!userName;
   } catch(e) { return false; }
 }
@@ -691,9 +694,9 @@ function updateStats(msg) {
   stats.depth = Math.max(0, Math.min(100, stats.depth + d));
   updateStatBars();
 
-  if (stats.trust >= 30 && stats.trust <= 32) showEvent('— Trust —');
-  if (stats.intimacy >= 25 && stats.intimacy <= 27) showEvent('— Intimacy —');
-  if (stats.depth >= 20 && stats.depth <= 22) showEvent('— Depth —');
+  if (stats.trust >= 30 && !milestones.trust30) { milestones.trust30 = true; showEvent('— Trust —'); }
+  if (stats.intimacy >= 25 && !milestones.intimacy25) { milestones.intimacy25 = true; showEvent('— Intimacy —'); }
+  if (stats.depth >= 20 && !milestones.depth20) { milestones.depth20 = true; showEvent('— Depth —'); }
 }
 
 function showEvent(text) {
